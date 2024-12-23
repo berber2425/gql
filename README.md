@@ -1,0 +1,2 @@
+# gql
+Berber GraphQL Schema
