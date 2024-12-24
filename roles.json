@@ -1,0 +1,110 @@
+{
+    "admin": {
+        "{country}": {
+            "_param": {
+                "description": "Country codes: US, CA, GB, etc.",
+                "type": "string[]"
+            },
+            "users": {
+                "read": true,
+                "create": true,
+                "update": true,
+                "delete": true,
+                "auth": {
+                    "read": true,
+                    "update": true,
+                    "delete": true
+                }
+            },
+            "cities": {
+                "{city}": {
+                    "_param": {
+                        "description": "City names: New York, Toronto, London, etc.",
+                        "type": "string[]"
+                    },
+                    "org": {
+                        "read": true,
+                        "create": true,
+                        "members": {
+                            "read": true,
+                            "create": true,
+                            "update": true,
+                            "delete": true
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "org": {
+        "members_servicers": {
+            "read": true,
+            "create": true,
+            "update": true,
+            "delete": true
+        },
+        "info": {
+            "read": true,
+            "update": true
+        },
+        "finance": {
+            "read": true,
+            "update": true
+        },
+        "branches": {
+            "{branch}": {
+                "_param": {
+                    "description": "Branch IDs",
+                    "type": "string[]"
+                },
+                "info": {
+                    "read": true,
+                    "update": true
+                },
+                "finance": {
+                    "read": true,
+                    "update": true
+                },
+                "members_servicers": {
+                    "read": true,
+                    "create": true,
+                    "update": true,
+                    "delete": true
+                },
+                "servicers": {
+                    "{servicer}": {
+                        "booking": {
+                            "read": true,
+                            "write": true
+                        },
+                        "info": {
+                            "read": true,
+                            "update": true
+                        },
+                        "finance": {
+                            "read": true,
+                            "update": true
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "client": {
+        "{user_ID}": {
+            "auth": true,
+            "info": {
+                "read": true,
+                "update": true
+            },
+            "booking": {
+                "read": true,
+                "write": true
+            },
+            "finance": {
+                "read": true,
+                "update": true
+            }
+        }
+    }
+}

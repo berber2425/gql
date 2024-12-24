@@ -1,0 +1,28 @@
+# import * from "./admin.graphql"
+# import * from "./auth.graphql"
+# import * from "./org.graphql"
+# import * from "./public.graphql"
+# import * from "./user.graphql"
+# import * from "./types.graphql"
+
+type Query {
+    admin: AdminQuery! @domain(domain: admin)
+    auth: AuthQuery! @domain(domain: auth)
+    org: OrgQuery! @domain(domain: org)
+    public: PublicQuery! @domain(domain: public)
+    user: UserQuery! @domain(domain: user)
+}
+
+type Mutation {
+    admin: AdminMutation! @domain(domain: admin)
+    auth: AuthMutation! @domain(domain: auth)
+    org: OrgMutation! @domain(domain: org)
+    user: UserMutation! @domain(domain: user)
+    public: PublicMutation! @domain(domain: public)
+}
+
+schema {
+    query: Query
+    mutation: Mutation
+}
+

@@ -1,0 +1,138 @@
+# import * from "./types.graphql"
+
+type TempMembership implements Node {
+    id: ID!
+    status: MemberStatus!
+    role: Role!
+    branch: Branch
+    organization: Organization!
+}
+
+type TempMembershipConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [TempMembership!]!
+  groups: GroupInfo
+}
+
+type OrgQuery {
+
+    us: Organization!
+    @resolver(permissions: [
+        # "/client/#"
+    ])
+
+    my_memberships(pagination: PaginationInput): TempMembershipConnection!
+    @resolver(permissions: [
+        "/client/#"
+    ])
+
+}
+
+enum CancellationPolicyTemplate {
+    DEFAULT
+    NO_REFUND
+    FLEXIBLE
+    STRICT
+}
+
+input AddressInput {
+    country: String!
+    city: String!
+    region: String!
+    line1: String!
+    line2: String
+    postal_code: String
+}
+
+input MainBranchInput {
+    name: String!
+    address: AddressInput!
+}
+
+input CreateOrgInput {
+
+    """
+    The name of the organization. If the organization is a company, it should be the company name. If the organization is an individual, it should be the individual's name.
+    """
+    name: String!
+    
+    """
+    The type of the organization.
+    """
+    type: OrganizationType!
+
+    hslAvatar: UploadingHsl
+    avatar: Upload
+    
+    address: AddressInput!
+
+    mainBranch: MainBranchInput!
+
+    """
+    The cancellation policy template to apply to the organization.
+    """
+    cp_template: CancellationPolicyTemplate!
+    
+    """
+    Whether to apply the cancellation policy template to all branches of the organization.
+    """
+    apply_cp_all_branches: Boolean
+
+    """
+    The contact of the organization owner. If the request is made by an admin, this should be the email of the user creating the organization.
+    """
+    owner_contact: Contact
+}
+
+
+type OrgMutation {
+
+    createOrg(input: CreateOrgInput!): Organization!
+    @resolver(permissions: [
+        "/client/#",
+        "/admin/org/create"
+    ])
+
+
+}
+
+input UpdateOrgInput {
+    name: String
+}
+
+type OrganizationMutation {
+    
+    updateOrg(input: UpdateOrgInput!): Organization!
+    @resolver(permissions: [
+        "/org/info/update"
+    ])
+
+    deleteOrg: Organization!
+    @resolver(permissions: [
+        "/org/delete"
+    ])
+}
+
+input CreateServiceInput {
+    type: ID!
+}
+
+input UpdateServiceInput {
+    id: ID!
+    name: String
+}
+
+type ServiceMutation {
+
+    createService(input: CreateServiceInput!): Service!
+    @resolver(permissions: [
+        "/org/service/create"
+    ])
+
+    updateService(input: UpdateServiceInput!): Service!
+    @resolver(permissions: [
+        "/org/service/update"
+    ])
+
+}
+

@@ -1,0 +1,9 @@
+schema:
+  - "./src/schema.graphql"
+documents:
+  - "./src/types.graphql"
+  - "./src/admin.graphql"
+  - "./src/auth.graphql"
+  - "./src/org.graphql"
+  - "./src/public.graphql"
+  - "./src/user.graphql"

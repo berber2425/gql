@@ -1,0 +1,80 @@
+# import * from "./types.graphql"
+
+input LocationInput {
+  latitude: Float!
+  longitude: Float!
+}
+
+type HomeResponse {
+  featured_organizations: [Organization!]!
+  featured_service_types: [ServiceType!]!
+
+  recent_organizations: [Organization!]!
+    @resolver(permissions: ["/client/booking/read"])
+
+  recent_service_types: [ServiceType!]!
+    @resolver(permissions: ["/client/booking/read"])
+
+  upcoming_bookings: [Booking!]!
+    @resolver(permissions: ["/client/booking/read"])
+
+  recommend_to_review: [Booking!]!
+    @resolver(permissions: ["/client/booking/read"])
+
+  nearby_organizations(location: LocationInput): [Organization!]!
+}
+
+type UserQuery {
+  home: HomeResponse! @resolver(permissions: [])
+
+  booking(id: ID!): Booking!
+    @resolver(permissions: ["/client/booking/@id/read"])
+}
+
+input MakeBookingRequest {
+  servicer_ID: ID!
+  service_types: [ID!]!
+  date: DateTime!
+}
+
+input ReviewBookingRequest {
+  rating: Int!
+  comment: String
+  images: [String!]
+}
+
+input UpdateProfileRequest {
+  name: String
+  avatar: String
+}
+
+type UserMutation {
+  update_profile(input: UpdateProfileRequest!): User!
+    @resolver(permissions: ["/client/#"])
+
+  make_booking(input: MakeBookingRequest!): Booking! @resolver(permissions: [])
+
+  cancel_booking(id: ID!): Boolean!
+    @resolver(permissions: ["/client/booking/@id/update"])
+
+  review_booking(id: ID!, input: ReviewBookingRequest!): Boolean!
+    @resolver(permissions: ["/client/booking/@id/update"])
+
+  remove_review(id: ID!): Boolean!
+    @resolver(permissions: ["/client/booking/@id/update"])
+
+  add_favorite(id: ID!): Boolean! @resolver(permissions: ["/client/#"])
+
+  remove_favorite(id: ID!): Boolean! @resolver(permissions: ["/client/#"])
+
+  add_to_cart(id: ID!): Boolean! @resolver(permissions: ["/client/#"])
+
+  remove_from_cart(id: ID!): Boolean! @resolver(permissions: ["/client/#"])
+
+  clear_cart: Boolean! @resolver(permissions: ["/client/#"])
+
+  checkout: Boolean! @resolver(permissions: ["/client/#"])
+
+  request_refund(id: ID!): Boolean!
+    @resolver(permissions: ["/client/booking/@id/update"])
+}

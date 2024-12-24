@@ -1,0 +1,873 @@
+# Tüm tipler için temel interface
+interface Node {
+  id: ID!
+}
+
+"""
+@resolver(permissions: [String!]!)
+This directive marks the field as a resolver required.
+
+If permissions is empty, it means that the field is public.
+
+Given permissions will be checked with OR logic.
+"""
+directive @resolver(permissions: [String!]!) on FIELD_DEFINITION
+
+"""
+@from(collection: String!)
+This directive marks the field as a document from the given collection.
+"""
+directive @from(collection: String!) on FIELD_DEFINITION
+
+directive @foreign_connection(
+  collection: String!
+  foreignField: String!
+) on FIELD_DEFINITION
+
+directive @foreign_grouped_connection(
+  collection: String!
+  foreignField: String!
+  groupFields: [String!]!
+) on FIELD_DEFINITION
+
+directive @from_collection(collection: String!) on FIELD_DEFINITION
+
+directive @paginate(collection: String!) on FIELD_DEFINITION
+
+directive @group_by(
+  collection: String!
+  groupFields: [String!]!
+) on FIELD_DEFINITION
+
+enum Domains {
+  user
+  org
+  admin
+  public
+  auth
+}
+
+directive @domain(domain: Domains!) on FIELD_DEFINITION
+
+# DateTime
+scalar DateTime
+
+# JSON
+scalar JSON
+
+# Any
+scalar Any
+
+# Email
+scalar Email
+
+# PhoneNumber
+scalar PhoneNumber
+
+# Contact
+scalar Contact
+
+# VerifyCode
+scalar VerifyCode
+
+scalar Base64Data # Base64 encoded data
+scalar Avatar # HSL or ID
+scalar Hsl # HSL color
+input UploadingHsl {
+  hsl: Hsl!
+}
+
+input Upload {
+  mimeType: String!
+  encoding: String # encoding of the file. Not data. Data is base64 encoded.
+  filename: String
+  data: Base64Data!
+}
+
+input PaginationInput {
+  filter: JSON
+
+  sort: String # field:order -> createdAt:desc
+  limit: Int = 50
+
+  cursor: String
+}
+
+# Pagination için genel tipler
+type PageInfo {
+  hasNextPage: Boolean!
+  nextCursor: String
+}
+
+type GroupKey {
+  value: Any!
+  count: Int!
+}
+
+type Group {
+  key: String!
+  values: [GroupKey!]!
+}
+
+type GroupInfo {
+  totalCount: Int!
+  groups: [Group!]!
+}
+
+# Connection pattern için genel interface
+interface Connection {
+  pageInfo: PageInfo!
+  items: [Node!]!
+  groups: GroupInfo
+}
+
+# Edge pattern için genel interface
+interface Edge {
+  cursor: String!
+  node: Node!
+}
+
+input DateRangeInput {
+  start: DateTime
+  end: DateTime
+}
+
+type User implements Node {
+  id: ID!
+  name: String!
+  avatar: Avatar!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  phone: PhoneNumber
+  email: Email
+
+  organization: Organization
+    @resolver(permissions: [])
+    @from(collection: "organizations")
+  organization_ID: ID
+
+  createdBy_ID: ID
+  createdBy: Member @resolver(permissions: []) @from(collection: "members")
+
+  """
+  @resolver_required
+  """
+  authMethods(pagination: PaginationInput): AuthMethodConnection!
+    @resolver(
+      permissions: [
+        "/client/@id/#" # Client own data
+        "/admin/users/auth/read" # Admin data
+      ]
+    )
+    @foreign_connection(collection: "auth", foreignField: "user")
+
+  members(pagination: PaginationInput): MemberConnection!
+    @resolver(permissions: ["/client/@id/#", "/admin/org/members/read"])
+    @foreign_connection(collection: "members", foreignField: "user_ID")
+
+  reviews(pagination: PaginationInput): ReviewConnection!
+    @resolver(permissions: [])
+    @foreign_connection(collection: "reviews", foreignField: "user_ID")
+}
+
+type UserConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [User!]!
+  groups: GroupInfo
+}
+
+type Address {
+  country: String!
+  city: String!
+  region: String!
+  line1: String!
+  line2: String
+  postal_code: String
+}
+
+type Location {
+  latitude: Float!
+  longitude: Float!
+}
+
+enum FeedbackType {
+  FEEDBACK
+  COMPLAINT
+}
+
+enum FeedbackStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum FeedbackCategory {
+  SERVICE
+  SERVICER
+  ORGANIZATION
+  USER
+  REVIEW
+  OTHER
+}
+
+type Feedback {
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  status: FeedbackStatus!
+  type: FeedbackType!
+  category: FeedbackCategory!
+  comment: String
+  images: [String!]
+
+  issuer: User @resolver(permissions: [])
+  issuer_ID: ID
+
+  user: User @resolver(permissions: [])
+  user_ID: ID
+
+  organization: Organization @resolver(permissions: [])
+  organization_ID: ID
+
+  servicer: Servicer @resolver(permissions: [])
+  servicer_ID: ID
+
+  review: Review @resolver(permissions: [])
+  review_ID: ID
+
+  branch: Branch @resolver(permissions: [])
+  branch_ID: ID
+
+  service: Service @resolver(permissions: [])
+  service_ID: ID
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  APPLE
+}
+
+type ProviderInfo {
+  id: ID!
+  name: String!
+  email: String!
+  avatar: String
+  token: String
+  refreshToken: String
+  expiresAt: DateTime
+}
+
+type AuthMethod implements Node {
+  id: ID!
+  provider: AuthProvider!
+
+  """
+  @resolver_required
+  """
+  user: User!
+    @resolver(permissions: ["/client/@user_ID/#"])
+    @from(collection: "users")
+  user_ID: ID!
+
+  info: ProviderInfo!
+  verified: Boolean!
+}
+
+type AuthMethodConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [AuthMethod!]!
+  groups: GroupInfo
+}
+
+type AuthMethodEdge implements Edge {
+  cursor: String!
+  node: AuthMethod!
+}
+
+type AdminRole implements Node {
+  id: ID!
+  name: String!
+  description: String!
+
+  permissions: [String!]!
+}
+
+"""
+Platform admin
+"""
+type Admin implements Node {
+  id: ID!
+
+  user: User @from(collection: "users")
+  user_ID: ID
+
+  email: String!
+
+  role: AdminRole! @from(collection: "admin_roles")
+  role_ID: ID!
+
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AdminConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [Admin!]!
+  groups: GroupInfo
+}
+
+enum MemberStatus {
+  ACTIVE
+  PENDING
+  INACTIVE
+}
+
+type Member implements Node {
+  id: ID!
+
+  user: User @resolver(permissions: []) @from(collection: "users")
+
+  user_ID: ID
+
+  contact: Contact
+
+  status: MemberStatus!
+
+  role: Role!
+    @resolver(
+      permissions: [
+        "/admin/org/members/read" # admin
+        "/org/@organization_ID/members_servicers/read" # org management
+        "/org/@organization_ID/branches/@branch_ID/members/read" # branch management
+      ]
+    )
+    @from(collection: "member-roles")
+  role_ID: ID!
+
+  branch: Branch @resolver(permissions: []) @from(collection: "branches")
+  branch_ID: ID
+
+  organization: Organization!
+    @resolver(permissions: [])
+    @from(collection: "organizations")
+  organization_ID: ID!
+
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type MemberConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [Member!]!
+  groups: GroupInfo
+}
+
+"""
+Service types globally pre-defined by the platform.
+Organizations cannot create or delete them.
+
+Service types are pre-defined because users can search & filter for them by name in own language.
+Translations are managed by the platform. That's why we can support multiple languages.
+
+ServiceType is a global entity. So it has no organizationId, duration, price, etc.
+
+Organizations can assign services to their servicers.
+"""
+type ServiceType implements Node {
+  id: ID!
+  name: String!
+  avatar: String!
+
+  booking_count(range: DateRangeInput, verified: Boolean): Int!
+    @resolver(permissions: []) # Custom resolver required
+  servicer_count: Int! @resolver(permissions: []) # Custom resolver required
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdBy: Admin! @resolver(permissions: [])
+  createdBy_ID: ID!
+
+  updatedBy: Admin! @resolver(permissions: [])
+  updatedBy_ID: ID!
+}
+
+type ServiceTypeConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [ServiceType!]!
+  groups: GroupInfo
+}
+
+type ServiceTemplate implements Node {
+  id: ID!
+  name: String!
+  serviceType: ServiceType!
+    @resolver(permissions: [])
+    @from(collection: "service_types")
+  serviceType_ID: ID!
+
+  organization: Organization!
+    @resolver(permissions: [])
+    @from(collection: "organizations")
+  organization_ID: ID!
+
+  services(pagination: PaginationInput): ServiceConnection!
+    @resolver(permissions: [])
+    @foreign_connection(collection: "services", foreignField: "serviceType_ID")
+
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  duration: Int!
+  price: Float!
+}
+
+type ServiceTemplateConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [ServiceTemplate!]!
+  groups: GroupInfo
+}
+
+type Service implements Node {
+  id: ID!
+
+  serviceType: ServiceType!
+    @resolver(permissions: [])
+    @from(collection: "service_types")
+  serviceType_ID: ID!
+
+  organization: Organization!
+    @resolver(permissions: [])
+    @from(collection: "organizations")
+  organization_ID: ID!
+
+  duration: Int!
+  price: Float!
+
+  servicer: Servicer! @resolver(permissions: [])
+  servicer_ID: ID!
+
+  branch: Branch! @resolver(permissions: [])
+  branch_ID: ID!
+
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ServiceConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [Service!]!
+  groups: GroupInfo
+}
+
+enum ServicerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+type Servicer implements Node {
+  id: ID!
+
+  member: Member! @resolver(permissions: []) @from(collection: "members")
+  member_ID: ID!
+
+  branch: Branch! @resolver(permissions: []) @from(collection: "branches")
+  branch_ID: ID!
+
+  organization: Organization!
+    @resolver(permissions: [])
+    @from(collection: "organizations")
+  organization_ID: ID!
+
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  services(pagination: PaginationInput): ServiceConnection!
+    @resolver(permissions: [])
+    @foreign_connection(collection: "services", foreignField: "servicer_ID")
+
+  availabilities(pagination: PaginationInput): AvailabilityConnection!
+    @resolver(permissions: [])
+    @foreign_connection(
+      collection: "availabilities"
+      foreignField: "servicer_ID"
+    )
+
+  reviews(pagination: PaginationInput): ReviewConnection!
+    @resolver(permissions: [])
+    @foreign_connection(collection: "reviews", foreignField: "servicer_ID")
+}
+
+type ServicerConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [Servicer!]!
+  groups: GroupInfo
+}
+
+type Availability implements Node {
+  id: ID!
+  start: DateTime!
+  end: DateTime!
+  duration: Int!
+
+  servicer: Servicer! @resolver(permissions: []) @from(collection: "servicers")
+  servicer_ID: ID!
+}
+
+type AvailabilityConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [Availability!]!
+  groups: GroupInfo
+}
+
+type Role implements Node {
+  id: ID!
+  name: String!
+  permissions: [String!]!
+
+  organization: Organization!
+    @resolver(permissions: [])
+    @from(collection: "organizations")
+  organization_ID: ID!
+
+  members(pagination: PaginationInput): MemberConnection!
+    @resolver(permissions: [])
+    @foreign_connection(collection: "members", foreignField: "role_ID")
+
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type RoleConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [Role!]!
+  groups: GroupInfo
+}
+
+enum OrganizationType {
+  MULTI_BRANCH
+  SINGLE_BRANCH
+  FREELANCER
+}
+
+type Organization implements Node {
+  id: ID!
+  name: String!
+  type: OrganizationType!
+  avatar: Avatar!
+
+  """
+  @resolver_required
+  """
+  members(pagination: PaginationInput): MemberConnection!
+    @resolver(
+      permissions: [
+        "/admin/org/members/read" # admin
+        "/org/@id/members_servicers/read" # org management
+      ]
+    )
+    @foreign_connection(collection: "members", foreignField: "organization_ID")
+
+  branches(pagination: PaginationInput): BranchConnection!
+    @resolver(
+      permissions: [
+        "/admin/org/branches/read" # admin
+        "/org/@id/info/read" # org management
+      ]
+    )
+    @foreign_connection(collection: "branches", foreignField: "organization_ID")
+
+  """
+  @resolver_required
+  """
+  servicers(pagination: PaginationInput): ServicerConnection!
+    @resolver(
+      permissions: [
+        "/admin/org/servicers/read" # admin
+        "/org/@id/members_servicers/read" # org management
+      ]
+    )
+    @foreign_connection(
+      collection: "servicers"
+      foreignField: "organization_ID"
+    )
+
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  global_cancellation_policy: CancellationPolicy
+    @resolver(permissions: [])
+    @from(collection: "cancellation_policies")
+  global_cancellation_policy_ID: ID
+
+  cancellation_policies(
+    pagination: PaginationInput
+  ): CancellationPolicyConnection!
+    @resolver(permissions: [])
+    @foreign_connection(
+      collection: "cancellation_policies"
+      foreignField: "organization_ID"
+    )
+
+  reviews(pagination: PaginationInput): ReviewConnection!
+    @resolver(permissions: [])
+    @foreign_connection(collection: "reviews", foreignField: "organization_ID")
+}
+
+type OrganizationConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [Organization!]!
+  groups: GroupInfo
+}
+
+type ActiveTime {
+  start: Int! # 0-1440 (minutes)
+  end: Int! # 0-1440 (minutes)
+}
+
+enum BranchType {
+  FRANCHISE
+  COMPANY_OWNED
+}
+
+type Branch implements Node {
+  id: ID!
+  name: String!
+  type: BranchType!
+
+  """
+  @resolver_required
+  """
+  organization: Organization!
+    @resolver(permissions: [])
+    @from(collection: "organizations")
+  organization_ID: ID!
+
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  address: Address!
+  location: Location!
+  active_times: [ActiveTime!]!
+  booking_buffer: Int! # minutes
+  booking_range: Int! # days
+  """
+  @resolver_required
+  """
+  servicers(pagination: PaginationInput): ServicerConnection!
+    @resolver(permissions: [])
+    @foreign_connection(collection: "servicers", foreignField: "branch_ID")
+
+  """
+  @resolver_required
+  """
+  services(pagination: PaginationInput): ServiceConnection!
+    @resolver(permissions: [])
+    @foreign_connection(collection: "services", foreignField: "branch_ID")
+
+  cancellation_policy: CancellationPolicy @resolver(permissions: []) # can be null . # Custom resolver required
+  reviews(pagination: PaginationInput): ReviewConnection!
+    @resolver(permissions: [])
+    @foreign_connection(collection: "reviews", foreignField: "branch_ID")
+
+  featured_services: [MinimalService!]! @resolver(permissions: []) # Custom resolver required
+}
+
+type BranchConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [Branch!]!
+  groups: GroupInfo
+}
+
+type MinimalService {
+  id: ID!
+  name: String!
+  price: Float!
+  duration: Int!
+}
+
+type CancellationPolicyRange {
+  hours: Int!
+  cancellation_fee: Float!
+  can_change_date: Boolean!
+  can_modify_incremental: Boolean!
+  can_modify_decremental: Boolean!
+}
+
+type CancellationPolicy implements Node {
+  id: ID!
+  ranges: [CancellationPolicyRange!]!
+  organization: Organization!
+    @resolver(permissions: [])
+    @from(collection: "organizations")
+  organization_ID: ID!
+
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  branch: Branch @resolver(permissions: []) @from(collection: "branches") # can be null if the cancellation policy is global
+  branch_ID: ID
+}
+
+type CancellationPolicyConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [CancellationPolicy!]!
+  groups: GroupInfo
+}
+
+enum CancellationBy {
+  SERVICER
+  USER
+}
+
+type Cancellation {
+  amount: Float!
+  currency: String!
+  reason: String!
+  cancellation_fee: Float!
+  cancelled_by: CancellationBy!
+
+  user: User @resolver(permissions: []) @from(collection: "users") # User who made the cancellation. Can be null if the cancellation was made by a non-user (guest)
+  user_ID: ID!
+
+  booking: Booking! @resolver(permissions: []) @from(collection: "bookings")
+  booking_ID: ID!
+
+  servicer: Servicer! @resolver(permissions: []) @from(collection: "servicers")
+  servicer_ID: ID!
+
+  member: Member! @resolver(permissions: []) @from(collection: "members") # Member who made the cancellation. Can be null if the cancellation was made by a non-member (guest)
+  member_ID: ID!
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+type Booking implements Node {
+  id: ID!
+  start: DateTime!
+  end: DateTime!
+  services: [MinimalService!]! # hooks service snapshot at the time of booking creation
+  status: BookingStatus!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  servicer: Servicer! @resolver(permissions: []) @from(collection: "servicers")
+  servicer_ID: ID!
+
+  branch: Branch! @resolver(permissions: []) @from(collection: "branches")
+  branch_ID: ID!
+
+  organization: Organization!
+    @resolver(permissions: [])
+    @from(collection: "organizations")
+  organization_ID: ID!
+
+  payment: Payment @resolver(permissions: []) @from(collection: "payments") # Payment
+  payment_ID: ID!
+
+  user: User @resolver(permissions: []) @from(collection: "users") # User who made the booking. Can be null if the booking was made by a non-user (guest)
+  user_ID: ID!
+
+  refund: Refund @resolver(permissions: []) @from(collection: "refunds") # Refund
+  refund_ID: ID
+
+  review: Review @resolver(permissions: []) @from(collection: "reviews") # Review
+  review_ID: ID
+
+  cancellation: Cancellation  # Cancellation
+    @resolver(permissions: [])
+    @from(collection: "cancellations")
+  cancellation_ID: ID
+}
+
+type BookingConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [Booking!]!
+  groups: GroupInfo
+}
+
+enum RefundStatus {
+  PENDING
+  REFUNDED
+}
+
+type Refund implements Node {
+  id: ID!
+  amount: Float!
+  currency: String!
+  status: RefundStatus!
+  payment: Payment! @resolver(permissions: []) @from(collection: "payments")
+  payment_ID: ID!
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  CANCELLED
+  REFUNDED
+}
+
+type Payment implements Node {
+  id: ID!
+  amount: Float!
+  currency: String!
+  status: PaymentStatus!
+
+  booking: Booking! @resolver(permissions: []) @from(collection: "bookings")
+  booking_ID: ID!
+
+  organization: Organization!
+    @resolver(permissions: [])
+    @from(collection: "organizations")
+  organization_ID: ID!
+
+  servicer: Servicer! @resolver(permissions: []) @from(collection: "servicers")
+  servicer_ID: ID!
+
+  branch: Branch! @resolver(permissions: []) @from(collection: "branches")
+  branch_ID: ID!
+
+  user: User @resolver(permissions: []) @from(collection: "users") # User who made the payment. Can be null if the payment was made by a non-user (guest)
+  user_ID: ID!
+
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  refund: Refund @resolver(permissions: []) @from(collection: "refunds") # Refund
+  refund_ID: ID
+}
+
+type PaymentConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [Payment!]!
+  groups: GroupInfo
+}
+
+enum ReviewMediaType {
+  IMAGE
+  VIDEO
+}
+
+type ReviewMedia {
+  url: String!
+  type: ReviewMediaType!
+}
+
+type Review implements Node {
+  id: ID!
+  rating: Int!
+  comment: String!
+  media: [ReviewMedia!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ReviewConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [Review!]!
+  groups: GroupInfo
+}

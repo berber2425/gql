@@ -1,0 +1,141 @@
+# import * from "./types.graphql"
+
+input FeedbackRequest {
+  type: FeedbackType!
+  comment: String
+  images: [String!]
+}
+
+type SupportedLanguage {
+  name: String!
+  version: Int!
+}
+
+type LanguageDocument {
+  language: String!
+  version: Int!
+  translations: JSON!
+}
+
+type TestObject implements Node {
+  id: ID!
+  value: Int!
+
+  """
+  this is integer
+  """
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  connectedTestObjects(
+    pagination: PaginationInput
+  ): ConnectedTestObjectConnection!
+    @resolver(permissions: [])
+    @foreign_connection(
+      collection: "connected_test_objects"
+      foreignField: "testObject_ID"
+    )
+}
+
+type ConnectedTestObject implements Node {
+  id: ID!
+
+  testObject: TestObject! @from(collection: "test_objects")
+  testObject_ID: ID!
+
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ConnectedTestObjectConnection {
+  pageInfo: PageInfo!
+  items: [ConnectedTestObject!]!
+}
+
+type TestObjectConnection implements Connection {
+  pageInfo: PageInfo!
+  items: [TestObject!]!
+  groups: GroupInfo
+}
+
+input TestObjectInput {
+  value: Int!
+}
+
+input ConnectedTestObjectInput {
+  testObject_ID: ID!
+}
+
+type PublicQuery {
+  user(id: ID!): User! @from_collection(collection: "users")
+
+  service(id: ID!): Service! @from_collection(collection: "services")
+
+  servicer(id: ID!): Servicer! @from_collection(collection: "servicers")
+
+  branch(id: ID!): Branch! @from_collection(collection: "branches")
+
+  service_type(id: ID!): ServiceType!
+    @from_collection(collection: "service_types")
+
+  organization(id: ID!): Organization!
+    @from_collection(collection: "organizations")
+
+  supported_languages: [SupportedLanguage!]! @resolver(permissions: [])
+
+  language_document(language: String!): LanguageDocument!
+    @resolver(permissions: [])
+
+  test_objects(pagination: PaginationInput): TestObjectConnection!
+    @resolver(permissions: [])
+    @paginate(collection: "test_objects")
+
+  test_objects_grouped(pagination: PaginationInput): TestObjectConnection!
+    @resolver(permissions: [])
+    @group_by(collection: "test_objects", groupFields: ["value"])
+}
+
+input SetDeviceIdInput {
+  fcm_token: String
+  apns_token: String
+  locales: String
+  ip: String
+  country: String
+  os: String
+  app_version: String
+  forwarded_from: ID
+}
+
+input SetForwardedFromInput {
+  forwarded_from: ID!
+}
+
+input SetFcmTokenInput {
+  fcm_token: String!
+  apns_token: String
+}
+
+type PublicMutation {
+  add_feedback(input: FeedbackRequest!): Boolean!
+    @resolver(permissions: ["/client/#"])
+
+  add_test_object(input: TestObjectInput!): TestObject!
+    @resolver(permissions: [])
+
+  update_test_object(id: ID!, input: TestObjectInput!): TestObject!
+    @resolver(permissions: [])
+
+  delete_test_object(id: ID!): Boolean! @resolver(permissions: [])
+
+  add_connected_test_object(
+    input: ConnectedTestObjectInput!
+  ): ConnectedTestObject! @resolver(permissions: [])
+
+  delete_connected_test_object(id: ID!): Boolean! @resolver(permissions: [])
+
+  set_device_id(input: SetDeviceIdInput!): String!
+
+  set_forwarded_from(id: ID!, input: SetForwardedFromInput!): Boolean!
+
+  set_fcm_token(id: ID!, input: SetFcmTokenInput!): Boolean!
+}
